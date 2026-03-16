@@ -1,0 +1,23 @@
+[project]
+name = "crypto-inheritance-ai-lab"
+version = "0.1.0"
+description = "Multi-agent AI research system for crypto inheritance startup analysis"
+requires-python = ">=3.11"
+dependencies = [
+    "google-generativeai>=0.8",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "python-docx>=1.1",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
