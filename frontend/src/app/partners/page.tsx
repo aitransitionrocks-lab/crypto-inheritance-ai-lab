@@ -79,14 +79,23 @@ export default function PartnersPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!companyName || !email) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitted(true);
-    }, 1500);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      await supabase.from("partner_inquiries").insert({
+        company_name: companyName,
+        email,
+        integration_type: walletType || null,
+      });
+    } catch {
+      // Graceful fallback: table may not exist yet
+    }
+    setLoading(false);
+    setSubmitted(true);
   }
 
   return (

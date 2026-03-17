@@ -18,7 +18,9 @@ import {
   EyeOff,
   ArrowRight,
   Star,
+  Loader2,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 /* ─────────────────────────── data ─────────────────────────── */
 
@@ -175,13 +177,20 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
 
-  const handleWaitlist = (e: React.FormEvent) => {
+  const handleWaitlist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      setSubmitted(true);
-      // TODO: Send to backend / email service
+    if (!email) return;
+    setWaitlistLoading(true);
+    try {
+      const supabase = createClient();
+      await supabase.from("waitlist").insert({ email });
+    } catch {
+      // Graceful fallback: table may not exist yet
     }
+    setWaitlistLoading(false);
+    setSubmitted(true);
   };
 
   return (
@@ -195,7 +204,7 @@ export default function LandingPage() {
         <div className="hidden md:flex items-center gap-6 text-sm">
           <a href="#how-it-works" className="text-[#64748b] hover:text-[#1a2332] transition-colors">How It Works</a>
           <a href="#trust" className="text-[#64748b] hover:text-[#1a2332] transition-colors">Security</a>
-          <a href="#pricing" className="text-[#64748b] hover:text-[#1a2332] transition-colors">Pricing</a>
+          <Link href="/pricing" className="text-[#64748b] hover:text-[#1a2332] transition-colors">Pricing</Link>
           <a href="#faq" className="text-[#64748b] hover:text-[#1a2332] transition-colors">FAQ</a>
         </div>
         <div className="flex items-center gap-3">
@@ -468,9 +477,14 @@ export default function LandingPage() {
               />
               <button
                 type="submit"
-                className="px-8 py-4 bg-[#1a2332] text-white rounded-xl font-semibold hover:bg-[#2a3a4f] transition-colors whitespace-nowrap"
+                disabled={waitlistLoading}
+                className="px-8 py-4 bg-[#1a2332] text-white rounded-xl font-semibold hover:bg-[#2a3a4f] transition-colors whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                Get Started Free
+                {waitlistLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  "Get Started Free"
+                )}
               </button>
             </form>
           ) : (

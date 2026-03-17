@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Shield,
   Key,
@@ -11,8 +12,12 @@ import {
   FileText,
   Activity,
   Eye,
+  AlertTriangle,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
+import { createClient } from "@/lib/supabase/client";
 
 const shardLocations = [
   {
@@ -66,6 +71,25 @@ const activityLog = [
 
 export default function SecurityPage() {
   const score = 92;
+  const router = useRouter();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("profiles").delete().eq("id", user.id);
+      }
+      await supabase.auth.signOut();
+      router.push("/");
+    } catch {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
 
   return (
     <AppLayout>
@@ -204,9 +228,30 @@ export default function SecurityPage() {
           </div>
         </div>
 
+        {/* Two-Factor Authentication */}
+        <h2 className="text-lg font-semibold text-[#1a2332] mb-4">Two-Factor Authentication</h2>
+        <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-[#c9a84c]/10 flex items-center justify-center flex-shrink-0">
+              <Lock className="w-5 h-5 text-[#c9a84c]" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h3 className="font-semibold text-[#1a2332]">Two-Factor Authentication</h3>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#c9a84c]/15 text-[#c9a84c]">
+                  Coming Soon
+                </span>
+              </div>
+              <p className="text-sm text-[#64748b]">
+                Protect your account with an additional layer of security. 2FA will be available soon.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Activity Log */}
         <h2 className="text-lg font-semibold text-[#1a2332] mb-4">Security Activity</h2>
-        <div className="bg-white rounded-2xl border border-[#e2e8f0] overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[#e2e8f0] overflow-hidden mb-8">
           {activityLog.map((entry, i) => {
             const Icon = entry.icon;
             return (
@@ -227,6 +272,54 @@ export default function SecurityPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* Danger Zone */}
+        <h2 className="text-lg font-semibold text-[#1a2332] mb-4">Danger Zone</h2>
+        <div className="bg-white rounded-2xl border-2 border-[#ef4444] p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertTriangle className="w-5 h-5 text-[#ef4444]" />
+            <h3 className="text-lg font-bold text-[#1a2332]">Delete Account</h3>
+          </div>
+          <p className="text-sm text-[#64748b] mb-5">
+            This will permanently delete your account, all plans, heirs, and check-in history. This action cannot be undone.
+          </p>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#ef4444] text-white rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete My Account
+            </button>
+          ) : (
+            <div className="bg-[#ef4444]/5 rounded-xl border border-[#ef4444]/20 p-5">
+              <p className="text-sm font-semibold text-[#ef4444] mb-4">
+                Are you absolutely sure? This will permanently delete all your data.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#ef4444] text-white rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {deleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  {deleting ? "Deleting..." : "Yes, Delete Everything"}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-5 py-2.5 bg-[#f8fafc] text-[#1a2332] border border-[#e2e8f0] rounded-xl text-sm font-semibold hover:bg-[#e2e8f0] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

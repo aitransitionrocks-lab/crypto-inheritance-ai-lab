@@ -250,6 +250,36 @@ export default function DevelopersPage() {
           </div>
         </section>
 
+        {/* Sandbox */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-[#1a2332] mb-6 flex items-center gap-2">
+            <Terminal className="w-6 h-6 text-[#c9a84c]" />
+            Sandbox
+          </h2>
+          <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6">
+            <p className="text-[#64748b] mb-4">
+              Test your integration in our sandbox environment. Use API key prefix{" "}
+              <code className="px-2 py-0.5 bg-[#f8fafc] rounded text-sm font-mono text-[#1a2332] border border-[#e2e8f0]">
+                lg_test_
+              </code>{" "}
+              for sandbox mode. All sandbox data is reset daily.
+            </p>
+            <div className="mt-4 p-3 bg-[#22c55e]/5 rounded-xl border border-[#22c55e]/20">
+              <p className="text-sm text-[#64748b]">
+                <span className="font-semibold text-[#22c55e]">Tip:</span> Sandbox requests behave identically to production but never affect real data.
+              </p>
+            </div>
+            <div className="mt-6">
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#1a2332] text-white rounded-xl font-semibold hover:bg-[#2a3a4f] transition-colors"
+              >
+                Get Sandbox Key <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Get API Key CTA */}
         <section>
           <div className="bg-white rounded-2xl border border-[#e2e8f0] p-8">

@@ -2,6 +2,7 @@
 
 import React from "react";
 import Sidebar from "./Sidebar";
+import BottomNav from "./BottomNav";
 import { Bell, User } from "lucide-react";
 
 interface AppLayoutProps {
@@ -11,9 +12,11 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="flex min-h-screen bg-bg">
-      <Sidebar />
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
       <div className="flex-1 flex flex-col">
-        <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-8">
+        <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-4 md:px-8">
           <h2 className="text-lg font-semibold text-text-primary">
             LegacyGuard
           </h2>
@@ -26,8 +29,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </button>
           </div>
         </header>
-        <main className="flex-1 p-8">{children}</main>
+        <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8">{children}</main>
       </div>
+      <BottomNav />
     </div>
   );
 }
