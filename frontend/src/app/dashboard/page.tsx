@@ -1,50 +1,135 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Shield,
   FileText,
   Clock,
   CheckCircle,
-  Activity,
   Users,
   AlertTriangle,
   ArrowRight,
-  Bell,
-  Key,
-  UserPlus,
+  Loader2,
+  Plus,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
+import { useAuth } from "@/hooks/useAuth";
+import { usePlans, useVaults, useCheckins } from "@/hooks/useSupabase";
+import type { InheritancePlan } from "@/lib/supabase/types";
 
-const plans = [
-  {
-    name: "Family Legacy Plan",
-    status: "active",
-    heirs: 3,
-    lastCheckIn: "2 hours ago",
-    triggerDays: 90,
-    nextCheckIn: "28 days",
-  },
-  {
-    name: "Business Backup",
-    status: "warning",
-    heirs: 1,
-    lastCheckIn: "75 days ago",
-    triggerDays: 90,
-    nextCheckIn: "15 days",
-  },
-];
+function getDaysSince(dateStr: string): number {
+  const now = new Date();
+  const then = new Date(dateStr);
+  return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
+}
 
-const activityLog = [
-  { action: "Check-in completed", time: "2 hours ago", icon: CheckCircle, color: "#22c55e" },
-  { action: "Heir added: Alice Smith", time: "3 days ago", icon: UserPlus, color: "#3b82f6" },
-  { action: "Plan created: Family Legacy Plan", time: "1 week ago", icon: FileText, color: "#c9a84c" },
-  { action: "Vault secured with 3 shards", time: "1 week ago", icon: Key, color: "#c9a84c" },
-  { action: "Account created", time: "1 week ago", icon: Shield, color: "#1a2332" },
-];
+function formatTimeAgo(dateStr: string): string {
+  const days = getDaysSince(dateStr);
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day ago";
+  if (days < 30) return `${days} days ago`;
+  if (days < 365) return `${Math.floor(days / 30)} month${Math.floor(days / 30) > 1 ? "s" : ""} ago`;
+  return `${Math.floor(days / 365)} year${Math.floor(days / 365) > 1 ? "s" : ""} ago`;
+}
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { plans, loading: plansLoading } = usePlans();
+  const { vaults, loading: vaultsLoading } = useVaults();
+  const { checkins, loading: checkinsLoading } = useCheckins();
+  const [heirCounts, setHeirCounts] = useState<Record<string, number>>({});
+
+  const isLoading = authLoading || plansLoading || vaultsLoading || checkinsLoading;
+
+  // Fetch heir counts for each plan
+  useEffect(() => {
+    if (plans.length === 0) return;
+    const fetchCounts = async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const counts: Record<string, number> = {};
+      for (const plan of plans) {
+        const { count } = await supabase
+          .from("heirs")
+          .select("*", { count: "exact", head: true })
+          .eq("plan_id", plan.id);
+        counts[plan.id] = count ?? 0;
+      }
+      setHeirCounts(counts);
+    };
+    fetchCounts();
+  }, [plans]);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/signup");
+    }
+  }, [authLoading, user, router]);
+
+  // Compute metrics
+  const lastCheckIn = checkins.length > 0 ? checkins[0] : null;
+  const activePlans = plans.filter((p) => p.status === "active" || p.status === "warning");
+
+  // Find earliest next check-in due across all plans
+  let nextCheckInDays: number | null = null;
+  if (lastCheckIn && plans.length > 0) {
+    const minTrigger = Math.min(...plans.map((p) => p.trigger_days));
+    const daysSinceLast = getDaysSince(lastCheckIn.checked_in_at);
+    nextCheckInDays = Math.max(0, minTrigger - daysSinceLast);
+  }
+
+  // Find plans that need attention
+  const warningPlan = plans.find((p) => {
+    if (!lastCheckIn) return false;
+    const daysSince = getDaysSince(lastCheckIn.checked_in_at);
+    return daysSince > p.trigger_days * 0.7;
+  });
+
+  function getPlanStatus(plan: InheritancePlan): "active" | "warning" {
+    if (!lastCheckIn) return "active";
+    const daysSince = getDaysSince(lastCheckIn.checked_in_at);
+    return daysSince > plan.trigger_days * 0.7 ? "warning" : "active";
+  }
+
+  if (authLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#1a2332]" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Empty state
+  if (!isLoading && plans.length === 0) {
+    return (
+      <AppLayout>
+        <div className="max-w-2xl mx-auto text-center py-20">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#c9a84c]/10 mb-6">
+            <Shield className="w-10 h-10 text-[#c9a84c]" />
+          </div>
+          <h1 className="text-2xl font-bold text-[#1a2332] mb-3">
+            Welcome to LegacyGuard
+          </h1>
+          <p className="text-[#64748b] text-lg mb-8 max-w-md mx-auto">
+            You haven&apos;t set up an inheritance plan yet. Get started in just 5 minutes to protect your crypto legacy.
+          </p>
+          <Link
+            href="/setup/vault"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-[#1a2332] text-white rounded-xl text-lg font-semibold hover:bg-[#2a3a4f] hover:shadow-xl transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            Set Up Your First Plan
+          </Link>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto">
@@ -64,25 +149,27 @@ export default function DashboardPage() {
         </div>
 
         {/* Security Alert Banner */}
-        <div className="mb-6 p-4 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-2xl flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-[#f59e0b] flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-[#1a2332]">Check-in Reminder</p>
-            <p className="text-sm text-[#64748b]">
-              Your &quot;Business Backup&quot; plan check-in is overdue by 75 days. Please check in to keep your plan active.
-            </p>
+        {warningPlan && (
+          <div className="mb-6 p-4 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-2xl flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-[#f59e0b] flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-[#1a2332]">Check-in Reminder</p>
+              <p className="text-sm text-[#64748b]">
+                Your &quot;{warningPlan.name}&quot; plan check-in is overdue. Please check in to keep your plan active.
+              </p>
+            </div>
+            <Link
+              href="/checkin"
+              className="px-4 py-2 bg-[#f59e0b] text-white rounded-lg text-sm font-semibold hover:bg-[#d97706] transition-colors flex-shrink-0"
+            >
+              Check In
+            </Link>
           </div>
-          <Link
-            href="/checkin"
-            className="px-4 py-2 bg-[#f59e0b] text-white rounded-lg text-sm font-semibold hover:bg-[#d97706] transition-colors flex-shrink-0"
-          >
-            Check In
-          </Link>
-        </div>
+        )}
 
         {/* Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Security Score - Circular */}
+          {/* Security Score */}
           <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-5">
               <div className="relative w-16 h-16">
@@ -113,7 +200,11 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-[#64748b]">Active Plans</p>
-                <p className="text-3xl font-bold text-[#1a2332]">2</p>
+                {plansLoading ? (
+                  <div className="h-9 w-12 bg-[#e2e8f0] animate-pulse rounded" />
+                ) : (
+                  <p className="text-3xl font-bold text-[#1a2332]">{activePlans.length}</p>
+                )}
               </div>
             </div>
           </div>
@@ -126,7 +217,13 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-[#64748b]">Next Check-in</p>
-                <p className="text-3xl font-bold text-[#1a2332]">15 <span className="text-lg font-medium text-[#64748b]">days</span></p>
+                {checkinsLoading ? (
+                  <div className="h-9 w-20 bg-[#e2e8f0] animate-pulse rounded" />
+                ) : nextCheckInDays !== null ? (
+                  <p className="text-3xl font-bold text-[#1a2332]">{nextCheckInDays} <span className="text-lg font-medium text-[#64748b]">days</span></p>
+                ) : (
+                  <p className="text-lg font-bold text-[#f59e0b]">Check in now</p>
+                )}
               </div>
             </div>
           </div>
@@ -140,72 +237,114 @@ export default function DashboardPage() {
               + New Plan
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className="bg-white rounded-2xl border border-[#e2e8f0] p-6 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-[#1a2332] text-lg">{plan.name}</h3>
+          {plansLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {[1, 2].map((i) => (
+                <div key={i} className="bg-white rounded-2xl border border-[#e2e8f0] p-6 animate-pulse">
+                  <div className="h-5 w-48 bg-[#e2e8f0] rounded mb-4" />
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="h-10 bg-[#e2e8f0] rounded" />
+                    <div className="h-10 bg-[#e2e8f0] rounded" />
+                    <div className="h-10 bg-[#e2e8f0] rounded" />
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      plan.status === "active"
-                        ? "bg-[#22c55e]/10 text-[#22c55e]"
-                        : "bg-[#f59e0b]/10 text-[#f59e0b]"
-                    }`}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {plans.map((plan) => {
+                const status = getPlanStatus(plan);
+                return (
+                  <div
+                    key={plan.id}
+                    className="bg-white rounded-2xl border border-[#e2e8f0] p-6 hover:shadow-md transition-shadow"
                   >
-                    {plan.status === "active" ? "Active" : "Needs Attention"}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-[#94a3b8] text-xs">Heirs</p>
-                    <p className="font-semibold text-[#1a2332] flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5 text-[#3b82f6]" /> {plan.heirs}
-                    </p>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="font-semibold text-[#1a2332] text-lg">{plan.name}</h3>
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          status === "active"
+                            ? "bg-[#22c55e]/10 text-[#22c55e]"
+                            : "bg-[#f59e0b]/10 text-[#f59e0b]"
+                        }`}
+                      >
+                        {status === "active" ? "Active" : "Needs Attention"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-[#94a3b8] text-xs">Heirs</p>
+                        <p className="font-semibold text-[#1a2332] flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-[#3b82f6]" /> {heirCounts[plan.id] ?? 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#94a3b8] text-xs">Last Check-in</p>
+                        <p className="font-semibold text-[#1a2332]">
+                          {lastCheckIn ? formatTimeAgo(lastCheckIn.checked_in_at) : "Never"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#94a3b8] text-xs">Trigger</p>
+                        <p className="font-semibold text-[#1a2332]">{plan.trigger_days}d</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[#94a3b8] text-xs">Last Check-in</p>
-                    <p className="font-semibold text-[#1a2332]">{plan.lastCheckIn}</p>
-                  </div>
-                  <div>
-                    <p className="text-[#94a3b8] text-xs">Trigger</p>
-                    <p className="font-semibold text-[#1a2332]">{plan.triggerDays}d</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Recent Activity */}
         <div>
-          <h2 className="text-lg font-semibold text-[#1a2332] mb-4">Recent Activity</h2>
-          <div className="bg-white rounded-2xl border border-[#e2e8f0] overflow-hidden">
-            {activityLog.map((entry, i) => {
-              const Icon = entry.icon;
-              return (
+          <h2 className="text-lg font-semibold text-[#1a2332] mb-4">Recent Check-ins</h2>
+          {checkinsLoading ? (
+            <div className="bg-white rounded-2xl border border-[#e2e8f0] p-6 animate-pulse">
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-8 bg-[#e2e8f0] rounded" />
+                ))}
+              </div>
+            </div>
+          ) : checkins.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-[#e2e8f0] p-8 text-center">
+              <p className="text-[#64748b]">No check-ins yet. Complete your first check-in to keep your plan active.</p>
+              <Link
+                href="/checkin"
+                className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#c9a84c] hover:text-[#b8973f]"
+              >
+                Check In Now <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-[#e2e8f0] overflow-hidden">
+              {checkins.slice(0, 5).map((ci, i) => (
                 <div
-                  key={i}
+                  key={ci.id}
                   className={`flex items-center gap-4 px-6 py-4 ${
-                    i < activityLog.length - 1 ? "border-b border-[#e2e8f0]" : ""
+                    i < Math.min(checkins.length, 5) - 1 ? "border-b border-[#e2e8f0]" : ""
                   }`}
                 >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: `${entry.color}15` }}
-                  >
-                    <Icon className="w-4 h-4" style={{ color: entry.color }} />
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#22c55e]/10">
+                    <CheckCircle className="w-4 h-4 text-[#22c55e]" />
                   </div>
-                  <span className="text-sm text-[#1a2332] flex-1 font-medium">{entry.action}</span>
-                  <span className="text-xs text-[#94a3b8]">{entry.time}</span>
+                  <span className="text-sm text-[#1a2332] flex-1 font-medium">Check-in completed</span>
+                  <span className="text-xs text-[#94a3b8]">
+                    {new Date(ci.checked_in_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

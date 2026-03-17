@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,9 +17,10 @@ import {
   AlertTriangle,
   Users,
 } from "lucide-react";
-import { apiPost } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 
-interface Heir {
+interface HeirForm {
   name: string;
   email: string;
   relationship: string;
@@ -49,14 +50,21 @@ const checkInMethods = [
 
 export default function PlanSetupPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [planName, setPlanName] = useState("");
   const [triggerDays, setTriggerDays] = useState(90);
   const [checkInMethod, setCheckInMethod] = useState("email");
-  const [heirs, setHeirs] = useState<Heir[]>([
+  const [heirs, setHeirs] = useState<HeirForm[]>([
     { name: "", email: "", relationship: "" },
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/signup");
+    }
+  }, [authLoading, user, router]);
 
   function addHeir() {
     setHeirs([...heirs, { name: "", email: "", relationship: "" }]);
@@ -66,7 +74,7 @@ export default function PlanSetupPage() {
     setHeirs(heirs.filter((_, i) => i !== index));
   }
 
-  function updateHeir(index: number, field: keyof Heir, value: string) {
+  function updateHeir(index: number, field: keyof HeirForm, value: string) {
     const updated = [...heirs];
     updated[index] = { ...updated[index], [field]: value };
     setHeirs(updated);
@@ -86,15 +94,48 @@ export default function PlanSetupPage() {
 
     setLoading(true);
     try {
-      const planRes = await apiPost<{ id: string }>("/api/plans", {
-        name: planName,
-        trigger_days: triggerDays,
-        check_in_method: checkInMethod,
-      });
-      const planId = planRes.data.id;
-      for (const heir of heirs) {
-        await apiPost(`/api/plans/${planId}/heirs`, heir);
-      }
+      const supabase = createClient();
+
+      // Get user's first vault (if any) to associate with plan
+      const { data: vaults } = await supabase
+        .from("vaults")
+        .select("id")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const vaultId = vaults && vaults.length > 0 ? vaults[0].id : null;
+
+      // Insert plan
+      const { data: planData, error: planError } = await supabase
+        .from("inheritance_plans")
+        .insert({
+          user_id: user!.id,
+          vault_id: vaultId,
+          name: planName.trim(),
+          status: "active",
+          trigger_days: triggerDays,
+          check_in_method: checkInMethod,
+        })
+        .select("id")
+        .single();
+
+      if (planError) throw planError;
+
+      // Insert heirs
+      const heirInserts = heirs.map((h) => ({
+        plan_id: planData.id,
+        name: h.name.trim(),
+        email: h.email.trim(),
+        relationship: h.relationship || "other",
+      }));
+
+      const { error: heirError } = await supabase
+        .from("heirs")
+        .insert(heirInserts);
+
+      if (heirError) throw heirError;
+
       router.push("/setup/complete");
     } catch (err: unknown) {
       const apiErr = err as { message?: string };
@@ -109,6 +150,14 @@ export default function PlanSetupPage() {
     if (triggerDays <= 90) return "Recommended";
     if (triggerDays <= 180) return "Moderate";
     return "Extended";
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#1a2332]" />
+      </div>
+    );
   }
 
   return (

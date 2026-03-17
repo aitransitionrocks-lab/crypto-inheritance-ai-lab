@@ -14,10 +14,11 @@ import {
   ArrowRight,
   Loader2,
 } from "lucide-react";
-import { apiPost } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signUp, signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,14 +27,15 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isSignIn, setIsSignIn] = useState(false);
 
   function validate(): boolean {
     const errors: Record<string, string> = {};
     if (!email) errors.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(email)) errors.email = "Please enter a valid email address";
     if (!password) errors.password = "Password is required";
-    else if (password.length < 8) errors.password = "Password must be at least 8 characters";
-    if (password !== confirmPassword) errors.confirmPassword = "Passwords do not match";
+    else if (!isSignIn && password.length < 8) errors.password = "Password must be at least 8 characters";
+    if (!isSignIn && password !== confirmPassword) errors.confirmPassword = "Passwords do not match";
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -45,11 +47,16 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      await apiPost("/api/users/register", { email, password });
-      router.push("/setup/vault");
+      if (isSignIn) {
+        await signIn(email, password);
+        router.push("/dashboard");
+      } else {
+        await signUp(email, password);
+        router.push("/setup/vault");
+      }
     } catch (err: unknown) {
-      const apiErr = err as { message?: string };
-      setError(apiErr.message || "Registration failed. Please try again.");
+      const authErr = err as { message?: string };
+      setError(authErr.message || (isSignIn ? "Sign in failed. Please try again." : "Registration failed. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -120,8 +127,12 @@ export default function SignupPage() {
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-[#1a2332] mb-2">Create Your Account</h1>
-            <p className="text-[#64748b]">Start protecting your crypto legacy today</p>
+            <h1 className="text-3xl font-bold text-[#1a2332] mb-2">
+              {isSignIn ? "Welcome Back" : "Create Your Account"}
+            </h1>
+            <p className="text-[#64748b]">
+              {isSignIn ? "Sign in to manage your crypto legacy" : "Start protecting your crypto legacy today"}
+            </p>
           </div>
 
           <div className="bg-white rounded-2xl border border-[#e2e8f0] p-8 shadow-sm">
@@ -175,30 +186,32 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {/* Confirm Password */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-[#1a2332]">Confirm Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94a3b8]" />
-                  <input
-                    type={showConfirm ? "text" : "password"}
-                    placeholder="Re-enter your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-11 pr-11 py-3 rounded-xl border border-[#e2e8f0] text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#c9a84c] focus:border-transparent transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b] cursor-pointer"
-                  >
-                    {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
+              {/* Confirm Password - only for sign up */}
+              {!isSignIn && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-[#1a2332]">Confirm Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94a3b8]" />
+                    <input
+                      type={showConfirm ? "text" : "password"}
+                      placeholder="Re-enter your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full pl-11 pr-11 py-3 rounded-xl border border-[#e2e8f0] text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#c9a84c] focus:border-transparent transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b] cursor-pointer"
+                    >
+                      {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {fieldErrors.confirmPassword && (
+                    <p className="text-xs text-[#ef4444]">{fieldErrors.confirmPassword}</p>
+                  )}
                 </div>
-                {fieldErrors.confirmPassword && (
-                  <p className="text-xs text-[#ef4444]">{fieldErrors.confirmPassword}</p>
-                )}
-              </div>
+              )}
 
               <button
                 type="submit"
@@ -208,11 +221,11 @@ export default function SignupPage() {
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Creating Account...
+                    {isSignIn ? "Signing In..." : "Creating Account..."}
                   </>
                 ) : (
                   <>
-                    Create Account
+                    {isSignIn ? "Sign In" : "Create Account"}
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
@@ -234,10 +247,17 @@ export default function SignupPage() {
           </div>
 
           <p className="text-center text-sm text-[#64748b] mt-6">
-            Already have an account?{" "}
-            <Link href="/signup" className="text-[#1a2332] font-semibold hover:underline">
-              Sign In
-            </Link>
+            {isSignIn ? "Don't have an account? " : "Already have an account? "}
+            <button
+              onClick={() => {
+                setIsSignIn(!isSignIn);
+                setError("");
+                setFieldErrors({});
+              }}
+              className="text-[#1a2332] font-semibold hover:underline cursor-pointer"
+            >
+              {isSignIn ? "Create Account" : "Sign In"}
+            </button>
           </p>
         </div>
       </div>

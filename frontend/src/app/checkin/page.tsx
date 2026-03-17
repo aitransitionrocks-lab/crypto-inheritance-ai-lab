@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Shield,
   CheckCircle,
@@ -9,33 +10,73 @@ import {
   CalendarCheck,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
-import { apiPost } from "@/services/api";
-
-const pastCheckIns = [
-  { date: "March 15, 2026 at 2:30 PM", status: "Completed" },
-  { date: "February 14, 2026 at 10:15 AM", status: "Completed" },
-  { date: "January 12, 2026 at 4:45 PM", status: "Completed" },
-  { date: "December 10, 2025 at 9:00 AM", status: "Completed" },
-  { date: "November 8, 2025 at 1:20 PM", status: "Completed" },
-];
+import { useAuth } from "@/hooks/useAuth";
+import { useCheckins, usePlans } from "@/hooks/useSupabase";
+import { createClient } from "@/lib/supabase/client";
 
 export default function CheckInPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { checkins, loading: checkinsLoading, refetch: refetchCheckins } = useCheckins();
+  const { plans, loading: plansLoading } = usePlans();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/signup");
+    }
+  }, [authLoading, user, router]);
+
+  const lastCheckIn = checkins.length > 0 ? checkins[0] : null;
+  const minTriggerDays = plans.length > 0 ? Math.min(...plans.map((p) => p.trigger_days)) : 90;
+
+  function getNextDueDate(): string {
+    const base = success ? new Date() : lastCheckIn ? new Date(lastCheckIn.checked_in_at) : new Date();
+    const next = new Date(base);
+    next.setDate(next.getDate() + minTriggerDays);
+    return next.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+
+  function getDaysUntilDue(): number {
+    const base = success ? new Date() : lastCheckIn ? new Date(lastCheckIn.checked_in_at) : new Date();
+    const next = new Date(base);
+    next.setDate(next.getDate() + minTriggerDays);
+    return Math.max(0, Math.ceil((next.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+  }
 
   async function handleCheckIn() {
     setLoading(true);
     setError("");
     try {
-      await apiPost("/api/checkins");
+      const supabase = createClient();
+      const { error: dbError } = await supabase
+        .from("check_ins")
+        .insert({
+          user_id: user!.id,
+          plan_id: plans.length > 0 ? plans[0].id : null,
+          checked_in_at: new Date().toISOString(),
+        });
+      if (dbError) throw dbError;
       setSuccess(true);
+      refetchCheckins();
     } catch (err: unknown) {
       const apiErr = err as { message?: string };
       setError(apiErr.message || "Check-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (authLoading || checkinsLoading || plansLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#1a2332]" />
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -63,7 +104,7 @@ export default function CheckInPage() {
               </p>
               <div className="mt-6 p-4 bg-[#22c55e]/5 rounded-xl border border-[#22c55e]/20">
                 <p className="text-sm text-[#22c55e] font-semibold">
-                  Next check-in due: June 15, 2026
+                  Next check-in due: {getNextDueDate()}
                 </p>
               </div>
             </div>
@@ -108,10 +149,23 @@ export default function CheckInPage() {
               <div>
                 <p className="text-xs text-[#94a3b8] font-medium">Last Check-in</p>
                 <p className="text-sm font-bold text-[#1a2332]">
-                  {success ? "Just now" : "March 15, 2026"}
+                  {success
+                    ? "Just now"
+                    : lastCheckIn
+                      ? new Date(lastCheckIn.checked_in_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "Never"}
                 </p>
                 <p className="text-xs text-[#64748b]">
-                  {success ? "" : "2:30 PM"}
+                  {!success && lastCheckIn
+                    ? new Date(lastCheckIn.checked_in_at).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : ""}
                 </p>
               </div>
             </div>
@@ -124,10 +178,10 @@ export default function CheckInPage() {
               <div>
                 <p className="text-xs text-[#94a3b8] font-medium">Next Due</p>
                 <p className="text-sm font-bold text-[#1a2332]">
-                  {success ? "June 15, 2026" : "June 13, 2026"}
+                  {getNextDueDate()}
                 </p>
                 <p className="text-xs text-[#64748b]">
-                  {success ? "90 days" : "88 days left"}
+                  {getDaysUntilDue()} days left
                 </p>
               </div>
             </div>
@@ -137,26 +191,43 @@ export default function CheckInPage() {
         {/* Activity Log */}
         <div>
           <h2 className="text-lg font-semibold text-[#1a2332] mb-4">Check-in History</h2>
-          <div className="bg-white rounded-2xl border border-[#e2e8f0] overflow-hidden">
-            {pastCheckIns.map((ci, i) => (
-              <div
-                key={i}
-                className={`flex items-center gap-4 px-5 py-4 ${
-                  i < pastCheckIns.length - 1 ? "border-b border-[#e2e8f0]" : ""
-                }`}
-              >
-                <div className="w-8 h-8 rounded-lg bg-[#22c55e]/10 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-4 h-4 text-[#22c55e]" />
+          {checkins.length === 0 && !success ? (
+            <div className="bg-white rounded-2xl border border-[#e2e8f0] p-8 text-center">
+              <p className="text-[#64748b]">No check-ins yet. Complete your first check-in above.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-[#e2e8f0] overflow-hidden">
+              {checkins.slice(0, 10).map((ci, i) => (
+                <div
+                  key={ci.id}
+                  className={`flex items-center gap-4 px-5 py-4 ${
+                    i < Math.min(checkins.length, 10) - 1 ? "border-b border-[#e2e8f0]" : ""
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-[#22c55e]/10 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-4 h-4 text-[#22c55e]" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-[#1a2332]">
+                      {new Date(ci.checked_in_at).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}{" "}
+                      at{" "}
+                      {new Date(ci.checked_in_at).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-[#22c55e] bg-[#22c55e]/10 px-2.5 py-1 rounded-full">
+                    Completed
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-[#1a2332]">{ci.date}</p>
-                </div>
-                <span className="text-xs font-semibold text-[#22c55e] bg-[#22c55e]/10 px-2.5 py-1 rounded-full">
-                  {ci.status}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

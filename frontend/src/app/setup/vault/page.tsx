@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,7 +16,8 @@ import {
   Wallet,
   CheckCircle,
 } from "lucide-react";
-import { apiPost } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 
 const setupSteps = [
   { label: "Vault Setup", step: 1 },
@@ -26,10 +27,17 @@ const setupSteps = [
 
 export default function VaultSetupPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [vaultName, setVaultName] = useState("");
   const [wallets, setWallets] = useState([""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/signup");
+    }
+  }, [authLoading, user, router]);
 
   function addWallet() {
     setWallets([...wallets, ""]);
@@ -53,7 +61,15 @@ export default function VaultSetupPage() {
     }
     setLoading(true);
     try {
-      await apiPost("/api/vaults", { name: vaultName, wallets: wallets.filter(Boolean) });
+      const supabase = createClient();
+      const { error: dbError } = await supabase
+        .from("vaults")
+        .insert({
+          user_id: user!.id,
+          name: vaultName.trim(),
+          wallet_addresses: wallets.filter(Boolean),
+        });
+      if (dbError) throw dbError;
       router.push("/setup/plan");
     } catch (err: unknown) {
       const apiErr = err as { message?: string };
@@ -61,6 +77,14 @@ export default function VaultSetupPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#1a2332]" />
+      </div>
+    );
   }
 
   return (
