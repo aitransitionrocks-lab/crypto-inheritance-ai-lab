@@ -15,6 +15,7 @@ from backend.api.users import router as users_router
 from backend.api.plans import router as plans_router
 from backend.api.heirs import router as heirs_router
 from backend.api.triggers import router as triggers_router
+from backend.api.partners import router as partners_router
 
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ app.include_router(users_router)
 app.include_router(plans_router)
 app.include_router(heirs_router)
 app.include_router(triggers_router)
+app.include_router(partners_router)
 
 
 @app.get("/health")
