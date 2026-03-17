@@ -13,10 +13,14 @@ import {
   ArrowRight,
   Loader2,
   Plus,
+  Trash2,
+  Edit,
+  X,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlans, useVaults, useCheckins } from "@/hooks/useSupabase";
+import { createClient } from "@/lib/supabase/client";
 import type { InheritancePlan } from "@/lib/supabase/types";
 import { trackEvent } from "@/lib/analytics";
 
@@ -38,10 +42,12 @@ function formatTimeAgo(dateStr: string): string {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { plans, loading: plansLoading } = usePlans();
+  const { plans, loading: plansLoading, refetch: refetchPlans } = usePlans();
   const { vaults, loading: vaultsLoading } = useVaults();
   const { checkins, loading: checkinsLoading } = useCheckins();
   const [heirCounts, setHeirCounts] = useState<Record<string, number>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const isLoading = authLoading || plansLoading || vaultsLoading || checkinsLoading;
 
@@ -86,17 +92,41 @@ export default function DashboardPage() {
     nextCheckInDays = Math.max(0, minTrigger - daysSinceLast);
   }
 
-  // Find plans that need attention
-  const warningPlan = plans.find((p) => {
-    if (!lastCheckIn) return false;
-    const daysSince = getDaysSince(lastCheckIn.created_at);
-    return daysSince > p.trigger_interval_days * 0.7;
-  });
+  // Find plans that need attention (Feature 3: improved trigger evaluation)
+  const criticalPlans: { plan: InheritancePlan; daysOverdue: number }[] = [];
+  const warningPlans: { plan: InheritancePlan; daysUntilTrigger: number }[] = [];
 
-  function getPlanStatus(plan: InheritancePlan): "active" | "warning" {
-    if (!lastCheckIn) return "active";
-    const daysSince = getDaysSince(lastCheckIn.created_at);
-    return daysSince > plan.trigger_interval_days * 0.7 ? "warning" : "active";
+  for (const p of plans) {
+    const referenceDate = lastCheckIn ? lastCheckIn.created_at : p.created_at;
+    const daysSince = getDaysSince(referenceDate);
+    if (daysSince > p.trigger_interval_days) {
+      criticalPlans.push({ plan: p, daysOverdue: daysSince - p.trigger_interval_days });
+    } else if (daysSince > p.trigger_interval_days * 0.7) {
+      warningPlans.push({ plan: p, daysUntilTrigger: p.trigger_interval_days - daysSince });
+    }
+  }
+
+  function getPlanStatus(plan: InheritancePlan): "active" | "warning" | "critical" {
+    const referenceDate = lastCheckIn ? lastCheckIn.created_at : plan.created_at;
+    const daysSince = getDaysSince(referenceDate);
+    if (daysSince > plan.trigger_interval_days) return "critical";
+    if (daysSince > plan.trigger_interval_days * 0.7) return "warning";
+    return "active";
+  }
+
+  async function handleDeletePlan(planId: string) {
+    setDeleting(true);
+    try {
+      const supabase = createClient();
+      await supabase.from("heirs").delete().eq("plan_id", planId);
+      await supabase.from("inheritance_plans").delete().eq("id", planId);
+      setDeleteConfirmId(null);
+      refetchPlans();
+    } catch (err) {
+      console.error("Failed to delete plan:", err);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (authLoading) {
@@ -154,13 +184,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Security Alert Banner */}
-        {warningPlan && (
+        {warningPlans.length > 0 && (
           <div className="mb-6 p-4 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-2xl flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-[#f59e0b] flex-shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-[#1a2332]">Check-in Reminder</p>
               <p className="text-sm text-[#64748b]">
-                Your &quot;{warningPlan.plan_name}&quot; plan check-in is overdue. Please check in to keep your plan active.
+                Your &quot;{warningPlans[0].plan.plan_name}&quot; plan check-in is due in {warningPlans[0].daysUntilTrigger} days.
               </p>
             </div>
             <Link

@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/lib/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 
 export default function SignupPage() {
@@ -29,6 +30,11 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSignIn, setIsSignIn] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   useEffect(() => {
     trackEvent("signup_start");
@@ -43,6 +49,29 @@ export default function SignupPage() {
     if (!isSignIn && password !== confirmPassword) errors.confirmPassword = "Passwords do not match";
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setResetError("");
+    if (!resetEmail || !/\S+@\S+\.\S+/.test(resetEmail)) {
+      setResetError("Please enter a valid email address");
+      return;
+    }
+    setResetLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin + "/signup",
+      });
+      if (error) throw error;
+      setResetSuccess(true);
+    } catch (err: unknown) {
+      const authErr = err as { message?: string };
+      setResetError(authErr.message || "Failed to send reset link. Please try again.");
+    } finally {
+      setResetLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -237,6 +266,87 @@ export default function SignupPage() {
                 )}
               </button>
             </form>
+
+            {/* Forgot Password Link */}
+            {isSignIn && !showForgotPassword && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={() => {
+                    setShowForgotPassword(true);
+                    setResetEmail(email);
+                    setResetSuccess(false);
+                    setResetError("");
+                  }}
+                  className="text-sm text-[#c9a84c] hover:text-[#b8973f] font-medium hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
+            {/* Forgot Password Form */}
+            {showForgotPassword && (
+              <div className="mt-6 p-6 bg-[#f8fafc] rounded-xl border border-[#e2e8f0]">
+                {resetSuccess ? (
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#22c55e]/10 mb-3">
+                      <Mail className="w-6 h-6 text-[#22c55e]" />
+                    </div>
+                    <p className="text-sm font-semibold text-[#22c55e] mb-1">Check your email for the reset link.</p>
+                    <p className="text-xs text-[#64748b]">We sent a password reset link to {resetEmail}</p>
+                    <button
+                      onClick={() => {
+                        setShowForgotPassword(false);
+                        setResetSuccess(false);
+                      }}
+                      className="mt-3 text-sm text-[#1a2332] font-semibold hover:underline cursor-pointer"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="flex flex-col gap-3">
+                    <p className="text-sm font-semibold text-[#1a2332]">Reset Your Password</p>
+                    <p className="text-xs text-[#64748b]">Enter your email and we&apos;ll send you a reset link.</p>
+                    {resetError && (
+                      <div className="p-2 bg-[#ef4444]/5 border border-[#ef4444]/20 rounded-lg text-xs text-[#ef4444]">
+                        {resetError}
+                      </div>
+                    )}
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94a3b8]" />
+                      <input
+                        type="email"
+                        placeholder="you@example.com"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-[#e2e8f0] text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#c9a84c] focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        type="submit"
+                        disabled={resetLoading}
+                        className="flex-1 py-3 bg-[#1a2332] text-white rounded-xl font-semibold hover:bg-[#2a3a4f] transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                      >
+                        {resetLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Send Reset Link"
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPassword(false)}
+                        className="px-4 py-3 border border-[#e2e8f0] rounded-xl text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Trust badges */}
