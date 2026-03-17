@@ -31,17 +31,17 @@ export default function CheckInPage() {
   }, [authLoading, user, router]);
 
   const lastCheckIn = checkins.length > 0 ? checkins[0] : null;
-  const minTriggerDays = plans.length > 0 ? Math.min(...plans.map((p) => p.trigger_days)) : 90;
+  const minTriggerDays = plans.length > 0 ? Math.min(...plans.map((p) => p.trigger_interval_days)) : 90;
 
   function getNextDueDate(): string {
-    const base = success ? new Date() : lastCheckIn ? new Date(lastCheckIn.checked_in_at) : new Date();
+    const base = success ? new Date() : lastCheckIn ? new Date(lastCheckIn.created_at) : new Date();
     const next = new Date(base);
     next.setDate(next.getDate() + minTriggerDays);
     return next.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   }
 
   function getDaysUntilDue(): number {
-    const base = success ? new Date() : lastCheckIn ? new Date(lastCheckIn.checked_in_at) : new Date();
+    const base = success ? new Date() : lastCheckIn ? new Date(lastCheckIn.created_at) : new Date();
     const next = new Date(base);
     next.setDate(next.getDate() + minTriggerDays);
     return Math.max(0, Math.ceil((next.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
@@ -53,11 +53,11 @@ export default function CheckInPage() {
     try {
       const supabase = createClient();
       const { error: dbError } = await supabase
-        .from("check_ins")
+        .from("checkins")
         .insert({
           user_id: user!.id,
           plan_id: plans.length > 0 ? plans[0].id : null,
-          checked_in_at: new Date().toISOString(),
+          method: "app",
         });
       if (dbError) throw dbError;
       trackEvent("checkin_completed", { method: "manual" });
@@ -154,7 +154,7 @@ export default function CheckInPage() {
                   {success
                     ? "Just now"
                     : lastCheckIn
-                      ? new Date(lastCheckIn.checked_in_at).toLocaleDateString("en-US", {
+                      ? new Date(lastCheckIn.created_at).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -163,7 +163,7 @@ export default function CheckInPage() {
                 </p>
                 <p className="text-xs text-[#64748b]">
                   {!success && lastCheckIn
-                    ? new Date(lastCheckIn.checked_in_at).toLocaleTimeString("en-US", {
+                    ? new Date(lastCheckIn.created_at).toLocaleTimeString("en-US", {
                         hour: "numeric",
                         minute: "2-digit",
                       })
@@ -211,13 +211,13 @@ export default function CheckInPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-[#1a2332]">
-                      {new Date(ci.checked_in_at).toLocaleDateString("en-US", {
+                      {new Date(ci.created_at).toLocaleDateString("en-US", {
                         month: "long",
                         day: "numeric",
                         year: "numeric",
                       })}{" "}
                       at{" "}
-                      {new Date(ci.checked_in_at).toLocaleTimeString("en-US", {
+                      {new Date(ci.created_at).toLocaleTimeString("en-US", {
                         hour: "numeric",
                         minute: "2-digit",
                       })}

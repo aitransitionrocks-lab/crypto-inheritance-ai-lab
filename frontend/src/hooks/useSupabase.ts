@@ -131,10 +131,10 @@ export function useCheckins(planId?: string | null) {
         return
       }
       let query = supabase
-        .from('check_ins')
+        .from('checkins')
         .select('*')
         .eq('user_id', user.id)
-        .order('checked_in_at', { ascending: false })
+        .order('created_at', { ascending: false })
       if (planId) {
         query = query.eq('plan_id', planId)
       }

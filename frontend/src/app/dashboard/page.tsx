@@ -81,22 +81,22 @@ export default function DashboardPage() {
   // Find earliest next check-in due across all plans
   let nextCheckInDays: number | null = null;
   if (lastCheckIn && plans.length > 0) {
-    const minTrigger = Math.min(...plans.map((p) => p.trigger_days));
-    const daysSinceLast = getDaysSince(lastCheckIn.checked_in_at);
+    const minTrigger = Math.min(...plans.map((p) => p.trigger_interval_days));
+    const daysSinceLast = getDaysSince(lastCheckIn.created_at);
     nextCheckInDays = Math.max(0, minTrigger - daysSinceLast);
   }
 
   // Find plans that need attention
   const warningPlan = plans.find((p) => {
     if (!lastCheckIn) return false;
-    const daysSince = getDaysSince(lastCheckIn.checked_in_at);
-    return daysSince > p.trigger_days * 0.7;
+    const daysSince = getDaysSince(lastCheckIn.created_at);
+    return daysSince > p.trigger_interval_days * 0.7;
   });
 
   function getPlanStatus(plan: InheritancePlan): "active" | "warning" {
     if (!lastCheckIn) return "active";
-    const daysSince = getDaysSince(lastCheckIn.checked_in_at);
-    return daysSince > plan.trigger_days * 0.7 ? "warning" : "active";
+    const daysSince = getDaysSince(lastCheckIn.created_at);
+    return daysSince > plan.trigger_interval_days * 0.7 ? "warning" : "active";
   }
 
   if (authLoading) {
@@ -160,7 +160,7 @@ export default function DashboardPage() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-[#1a2332]">Check-in Reminder</p>
               <p className="text-sm text-[#64748b]">
-                Your &quot;{warningPlan.name}&quot; plan check-in is overdue. Please check in to keep your plan active.
+                Your &quot;{warningPlan.plan_name}&quot; plan check-in is overdue. Please check in to keep your plan active.
               </p>
             </div>
             <Link
@@ -266,7 +266,7 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <h3 className="font-semibold text-[#1a2332] text-lg">{plan.name}</h3>
+                        <h3 className="font-semibold text-[#1a2332] text-lg">{plan.plan_name}</h3>
                       </div>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -288,12 +288,12 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-[#94a3b8] text-xs">Last Check-in</p>
                         <p className="font-semibold text-[#1a2332]">
-                          {lastCheckIn ? formatTimeAgo(lastCheckIn.checked_in_at) : "Never"}
+                          {lastCheckIn ? formatTimeAgo(lastCheckIn.created_at) : "Never"}
                         </p>
                       </div>
                       <div>
                         <p className="text-[#94a3b8] text-xs">Trigger</p>
-                        <p className="font-semibold text-[#1a2332]">{plan.trigger_days}d</p>
+                        <p className="font-semibold text-[#1a2332]">{plan.trigger_interval_days}d</p>
                       </div>
                     </div>
                   </div>
@@ -338,7 +338,7 @@ export default function DashboardPage() {
                   </div>
                   <span className="text-sm text-[#1a2332] flex-1 font-medium">Check-in completed</span>
                   <span className="text-xs text-[#94a3b8]">
-                    {new Date(ci.checked_in_at).toLocaleDateString("en-US", {
+                    {new Date(ci.created_at).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",

@@ -113,10 +113,10 @@ export default function PlanSetupPage() {
         .insert({
           user_id: user!.id,
           vault_id: vaultId,
-          name: planName.trim(),
+          plan_name: planName.trim(),
           status: "active",
-          trigger_days: triggerDays,
-          check_in_method: checkInMethod,
+          trigger_interval_days: triggerDays,
+          checkin_method: checkInMethod,
         })
         .select("id")
         .single();
@@ -126,6 +126,7 @@ export default function PlanSetupPage() {
       // Insert heirs
       const heirInserts = heirs.map((h) => ({
         plan_id: planData.id,
+        user_id: user!.id,
         name: h.name.trim(),
         email: h.email.trim(),
         relationship: h.relationship || "other",
