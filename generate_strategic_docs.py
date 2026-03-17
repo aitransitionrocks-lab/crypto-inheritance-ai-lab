@@ -5,7 +5,10 @@ import time
 import json
 from pathlib import Path
 
-API_KEY = "AIzaSyABiqTWh-I4QqcdXtaz6SimLDgOLiaDM_c"
+import os
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
 REPORTS_DIR = Path("/Users/petermarggraff/AI-projekte/crypto_inheritance_ai_lab/reports")
 GENERATION_DATE = "2026-03-17"

@@ -5,7 +5,9 @@ import httpx
 import time
 import os
 
-API_KEY = "AIzaSyBjagXZXKBNGZyUbmsR2ebO6Hj7fGAjw24"
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
 REPORTS_DIR = "/Users/petermarggraff/AI-projekte/crypto_inheritance_ai_lab/reports"
 DATE = "2026-03-17"

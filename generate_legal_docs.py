@@ -6,7 +6,9 @@ import time
 import os
 from datetime import datetime
 
-API_KEY = "AIzaSyABiqTWh-I4QqcdXtaz6SimLDgOLiaDM_c"
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
 BASE = "/Users/petermarggraff/AI-projekte/crypto_inheritance_ai_lab"
 TODAY = "2026-03-17"
