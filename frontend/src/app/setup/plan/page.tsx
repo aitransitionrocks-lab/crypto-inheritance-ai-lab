@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
+import { trackEvent } from "@/lib/analytics";
 
 interface HeirForm {
   name: string;
@@ -135,6 +136,12 @@ export default function PlanSetupPage() {
         .insert(heirInserts);
 
       if (heirError) throw heirError;
+
+      // Track analytics events
+      for (const h of heirs) {
+        trackEvent("heir_added", { relationship: h.relationship || "other" });
+      }
+      trackEvent("trigger_configured", { interval_days: triggerDays, method: checkInMethod });
 
       router.push("/setup/complete");
     } catch (err: unknown) {

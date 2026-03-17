@@ -13,6 +13,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useCheckins, usePlans } from "@/hooks/useSupabase";
 import { createClient } from "@/lib/supabase/client";
+import { trackEvent } from "@/lib/analytics";
 
 export default function CheckInPage() {
   const router = useRouter();
@@ -59,6 +60,7 @@ export default function CheckInPage() {
           checked_in_at: new Date().toISOString(),
         });
       if (dbError) throw dbError;
+      trackEvent("checkin_completed", { method: "manual" });
       setSuccess(true);
       refetchCheckins();
     } catch (err: unknown) {

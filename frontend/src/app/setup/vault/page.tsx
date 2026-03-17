@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
+import { trackEvent } from "@/lib/analytics";
 
 const setupSteps = [
   { label: "Vault Setup", step: 1 },
@@ -70,6 +71,7 @@ export default function VaultSetupPage() {
           wallet_addresses: wallets.filter(Boolean),
         });
       if (dbError) throw dbError;
+      trackEvent("vault_created", { wallet_count: wallets.filter(Boolean).length });
       router.push("/setup/plan");
     } catch (err: unknown) {
       const apiErr = err as { message?: string };

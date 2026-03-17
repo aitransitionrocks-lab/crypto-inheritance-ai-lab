@@ -18,6 +18,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlans, useVaults, useCheckins } from "@/hooks/useSupabase";
 import type { InheritancePlan } from "@/lib/supabase/types";
+import { trackEvent } from "@/lib/analytics";
 
 function getDaysSince(dateStr: string): number {
   const now = new Date();
@@ -68,6 +69,10 @@ export default function DashboardPage() {
       router.push("/signup");
     }
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    trackEvent("page_view", { page: "/dashboard" });
+  }, []);
 
   // Compute metrics
   const lastCheckIn = checkins.length > 0 ? checkins[0] : null;

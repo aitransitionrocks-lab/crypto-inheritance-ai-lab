@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { trackEvent } from "@/lib/analytics";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -28,6 +29,10 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSignIn, setIsSignIn] = useState(false);
+
+  useEffect(() => {
+    trackEvent("signup_start");
+  }, []);
 
   function validate(): boolean {
     const errors: Record<string, string> = {};
@@ -52,6 +57,7 @@ export default function SignupPage() {
         router.push("/dashboard");
       } else {
         await signUp(email, password);
+        trackEvent("signup_complete");
         router.push("/setup/vault");
       }
     } catch (err: unknown) {
