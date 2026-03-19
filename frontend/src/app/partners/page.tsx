@@ -16,6 +16,9 @@ import {
   Lock,
   CheckCircle,
   ExternalLink,
+  BarChart3,
+  Link2,
+  Activity,
 } from "lucide-react";
 
 const benefits = [
@@ -278,6 +281,53 @@ export default function PartnersPage() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* Partner Analytics */}
+      <section className="bg-[#f1f5f9] py-20">
+        <div className="max-w-5xl mx-auto px-6 md:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1a2332] mb-4">
+              Partner Analytics
+            </h2>
+            <p className="text-lg text-[#64748b]">
+              Track your integration performance in real time.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            {[
+              { icon: Link2, label: "Active Integrations", value: "\u2014", color: "#3b82f6" },
+              { icon: Users, label: "End Users", value: "\u2014", color: "#22c55e" },
+              { icon: Activity, label: "API Calls", value: "\u2014", color: "#c9a84c" },
+              { icon: DollarSign, label: "Revenue", value: "\u2014", color: "#8b5cf6" },
+            ].map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <div
+                  key={metric.label}
+                  className="bg-white rounded-2xl border border-[#e2e8f0] p-6 text-center hover:shadow-lg transition-shadow"
+                >
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4"
+                    style={{ backgroundColor: `${metric.color}15` }}
+                  >
+                    <Icon className="w-6 h-6" style={{ color: metric.color }} />
+                  </div>
+                  <div className="text-3xl font-bold text-[#1a2332] mb-1">
+                    {metric.value}
+                  </div>
+                  <div className="text-sm text-[#64748b]">{metric.label}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="bg-white/60 border border-[#e2e8f0] rounded-xl p-4 text-center">
+            <p className="text-sm text-[#64748b]">
+              <BarChart3 className="w-4 h-4 inline mr-1" />
+              Analytics dashboard available after integration approval.
+            </p>
           </div>
         </div>
       </section>

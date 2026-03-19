@@ -16,7 +16,8 @@ const pricingPlans = [
       "90-day minimum trigger",
       "Basic dashboard",
     ],
-    cta: "Start Free",
+    cta: "Get Started",
+    ctaHref: "/signup",
     highlight: false,
   },
   {
@@ -32,7 +33,8 @@ const pricingPlans = [
       "Priority support",
       "Multi-chain support",
     ],
-    cta: "Start 14-Day Trial",
+    cta: "Start Free Trial",
+    ctaHref: "/signup?plan=pro",
     highlight: true,
   },
   {
@@ -49,6 +51,7 @@ const pricingPlans = [
       "Compliance reports",
     ],
     cta: "Contact Sales",
+    ctaHref: "mailto:sales@legacyguard.app",
     highlight: false,
   },
 ];
@@ -126,7 +129,7 @@ export default function PricingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/signup"
+                  href={plan.ctaHref}
                   className={`block w-full text-center py-3 rounded-xl font-semibold transition-all ${
                     plan.highlight
                       ? "bg-[#1a2332] text-white hover:bg-[#2a3a4f]"
@@ -138,6 +141,9 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
+          <p className="text-center text-sm text-[#64748b] mt-8">
+            14-day free trial on Pro. No credit card required.
+          </p>
         </div>
       </section>
 
